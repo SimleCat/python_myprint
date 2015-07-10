@@ -111,50 +111,58 @@ def moverightCursor(x):
     sys.stdout.write("\033[%dC" % x)
 
 
-def printString(x, y, string, mode='', fore='', back=''):
+def printString(x, y, string, mode='', fore='', back='', flush=True):
     moveCursor(x, y)
     str_style = useStyle(string, mode, fore, back)
     sys.stdout.write(str_style)
-    sys.stdout.flush()
+    if flush:
+        sys.stdout.flush()
 
-def printString_Center(num_line, string, mode='', fore='', back=''):
+def printString_Center(num_line, string, mode='', fore='', back='', flush=True):
     moveCursor(1, num_line)
     length = len(string)
     x = terminal_width//2 - length//2 + 1
     # printString(x, 2, "x = %d, num_line = %d" % (x, num_line))
-    printString(x, num_line, string, mode, fore, back)
+    printString(x, num_line, string, mode, fore, back, flush)
 
 
 
-def printHLine(x, y, length, ch, mode='', fore='', back=''):
-    printString(x, y, ch*length, mode, fore, back)
+def printHLine(x, y, length, ch, mode='', fore='', back='', flush=True):
+    printString(x, y, ch*length, mode, fore, back, flush)
 
-def printVLine(x, y, hight, ch, mode='', fore='', back=''):
+def printVLine(x, y, hight, ch, mode='', fore='', back='', flush=True):
     for i in range(hight):
-        printString(x, y+i, ch, mode, fore, back)
+        printString(x, y+i, ch, mode, fore, back, flush)
 
-def printRectangle(x1, y1, x2, y2, ch, mode='', fore='', back=''):
-    printHLine(x1, y1, x2-x1+1, ch, mode, fore, back)
-    printVLine(x1, y1+1, y2-y1, ch, mode, fore, back)
-    printHLine(x1, y2, x2-x1+1, ch, mode, fore, back)
-    printVLine(x2, y1+1, y2-y1, ch, mode, fore, back)
+def printRectangle(x1, y1, x2, y2, ch, mode='', fore='', back='', flush=True):
+    printHLine(x1, y1, x2-x1+1, ch, mode, fore, back, False)
+    printVLine(x1, y1+1, y2-y1, ch, mode, fore, back, False)
+    printHLine(x1, y2, x2-x1+1, ch, mode, fore, back, False)
+    printVLine(x2, y1+1, y2-y1, ch, mode, fore, back, False)
+    if flush:
+        sys.stdout.flush()
 
-def printSolidRectangle(x1, y1, x2, y2, ch, mode='', fore='', back=''):
+def printSolidRectangle(x1, y1, x2, y2, ch, mode='', fore='', back='', flush=True):
     width = x2-x1+1
     for y in range(y1, y2+1):
-        printHLine(x1, y, width, ch, mode, fore, back)
+        printHLine(x1, y, width, ch, mode, fore, back, False)
+    if flush:
+        sys.stdout.flush()    
 
-def printRectangle_Amend(x1, y1, x2, y2, ch, mode='', fore='', back=''):
-    printHLine(x1, y1, x2-x1+1, ch, mode, fore, back)
-    printVLine(x1, y1+1, y2-y1, ch, mode, fore, back)
-    printVLine(x1+1, y1+1, y2-y1, ch, mode, fore, back)
-    printHLine(x1, y2, x2-x1+1, ch, mode, fore, back)
-    printVLine(x2-1, y1+1, y2-y1, ch, mode, fore, back)    
-    printVLine(x2, y1+1, y2-y1, ch, mode, fore, back)
+
+def printRectangle_Amend(x1, y1, x2, y2, ch, mode='', fore='', back='', flush=True):
+    printHLine(x1, y1, x2-x1+1, ch, mode, fore, back, False)
+    printVLine(x1, y1+1, y2-y1, ch, mode, fore, back, False)
+    printVLine(x1+1, y1+1, y2-y1, ch, mode, fore, back, False)
+    printHLine(x1, y2, x2-x1+1, ch, mode, fore, back, False)
+    printVLine(x2-1, y1+1, y2-y1, ch, mode, fore, back, False)
+    printVLine(x2, y1+1, y2-y1, ch, mode, fore, back, False)
+    if flush:
+        sys.stdout.flush()        
 
  
 class OverScolling(object):
-    def __init__(self, x1, y1, x2, y2, mode='', fore='', back=''):
+    def __init__(self, x1, y1, x2, y2, mode='', fore='', back='', table_width=8):
         self.x1 = x1
         self.y1 = y1
         self.x2 = x2
@@ -164,6 +172,7 @@ class OverScolling(object):
         self.back = back
         self.width = x2 - x1 + 1
         self.hight = y2 - y1 + 1
+        self.table_width = table_width
         # self.cur_line = y1
         self.str_list = []
         self.str_list.append(('', 0))
@@ -184,12 +193,44 @@ class OverScolling(object):
             diff = 0 if self.str_list[i][1] <= self.str_list[i+1][1] \
                         else self.str_list[i][1] - self.str_list[i+1][1]
             string = self.str_list[i+1][0] + ' ' * diff
-            printString(self.x1, self.y1+i, string, self.mode, self.fore, self.back)
+            printString(self.x1, self.y1+i, string, self.mode, self.fore, self.back, False)
         moveCursor(self.x1+self.str_list[-1][1], self.y1+len(self.str_list)-1-1)
         sys.stdout.flush()
 
-    @staticmethod
-    def splitStringByLength(string, length):
+    def addToList(self, l, i, v):
+        if i < len(l):
+            l[i] = v
+        else:
+            l.append(v)
+        return l
+
+    def handleBRT(self, string):
+        l = []
+        i = 0
+        for c in string:
+            if c == '\b':
+                if i > 0:
+                    i -= 1
+            elif c == '\r':
+                i = 0
+            elif c == '\t':
+                i = (i//self.table_width + 1) * self.table_width
+                for n in range(len(l), i):
+                    l.append(' ')
+            else:
+                l = self.addToList(l, i, c)
+                i += 1
+        return ''.join(l)
+
+    def handleIgnore(self, string):
+        l = string.split("\f")
+        string = '\\f'.join(l)
+        l = string.split("\v")
+        string = '\\v'.join(l)
+        return string
+
+
+    def splitStringByLength(self, string, length):
         res = []
         num = len(string) // length
         for i in range(num):
@@ -198,16 +239,24 @@ class OverScolling(object):
         return res
 
 
+    def handleString(self, string, length):
+        res = []
+        string_n = string.split('\n')
+        for s in string_n:
+            s = self.handleBRT(s)
+            s = self.handleIgnore(s)
+            s = self.splitStringByLength(s, length)
+            res += s
+        return res
+
     def addString(self, string):
-        strings = self.splitStringByLength(string, self.width)
-        # print string
-        # print strings
+        strings = self.handleString(string, self.width)
         for s in strings:
             self.__addString_base(s)
 
 
 class OverScollingCenter(OverScolling):
-    def __init__(self, num_line, width, hight, mode='', fore='', back=''):
+    def __init__(self, num_line, width, hight, mode='', fore='', back='', table_width=8):
         self.num_line = num_line
         self.width = width if terminal_width > width else terminal_width
         self.hight = hight if terminal_hight > hight else terminal_hight
@@ -219,7 +268,7 @@ class OverScollingCenter(OverScolling):
         self.y1 = self.num_line
         self.y2 = self.y1 + self.hight - 1
         super(OverScollingCenter, self).__init__(self.x1, self.y1, self.x2, self.y2, \
-            self.mode, self.fore, self.back)
+            self.mode, self.fore, self.back, table_width)
 
 def test():
     clearScreen()
@@ -238,7 +287,7 @@ def test():
     cur_f = open(sys.argv[0], 'r')
     for i in range(100):
         # string = '#' * random.randint(0, 100) + '[%d]' % (i+1)
-        string = repr(cur_f.readline())
+        string = cur_f.readline()[:-1]
         string1 = '$' * random.randint(0, 100) + '[%d]' % (i+1)
         string2 = '%' * random.randint(0, 100) + '[%d]' % (i+1)
         scroll.addString(string)
@@ -247,9 +296,6 @@ def test():
         time.sleep(0.5)
     cur_f.close()
     moveCursor(1, terminal_hight)
-
-
-    # print ''
 
 
 if __name__ == '__main__':
